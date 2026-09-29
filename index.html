@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>救急欠員の代替候補</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+JP:wght@400;500;600&family=Zen+Kaku+Gothic+New:wght@700;900&display=swap">
+<style>
+/* Layout: one working column (max 980px). Top: file + absence form. Below: one block per open shift, candidates as a scannable list. */
+:root{
+  --bg:#f3f6f5; --surface:#ffffff; --sunk:#eaf0ee; --ink:#16211f; --muted:#5a6b68; --line:#d6dfdc;
+  --accent:#0e6b62; --accent-ink:#ffffff; --accent-soft:#e0f0ed;
+  --ok:#1f7646; --ok-soft:#e2f2e8; --warn:#8f5b00; --warn-soft:#fbefd6; --ng:#ab332c; --ng-soft:#f7e2df;
+  --f-display:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;
+  --f-body:"IBM Plex Sans JP","Hiragino Sans","Yu Gothic","Meiryo",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1413; --surface:#162020; --sunk:#111918; --ink:#e3ebe9; --muted:#93a4a1; --line:#293533;
+    --accent:#52b9ae; --accent-ink:#04201c; --accent-soft:#15302c;
+    --ok:#62c58e; --ok-soft:#142c1e; --warn:#e2aa4c; --warn-soft:#30250f; --ng:#ef7f76; --ng-soft:#381a17;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1413; --surface:#162020; --sunk:#111918; --ink:#e3ebe9; --muted:#93a4a1; --line:#293533;
+  --accent:#52b9ae; --accent-ink:#04201c; --accent-soft:#15302c;
+  --ok:#62c58e; --ok-soft:#142c1e; --warn:#e2aa4c; --warn-soft:#30250f; --ng:#ef7f76; --ng-soft:#381a17;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6;padding:0 16px}
+.wrap{max-width:980px;margin:0 auto;padding-block:28px 64px;display:flex;flex-direction:column;gap:22px}
+h1{font-family:var(--f-display);font-weight:900;font-size:1.75rem;letter-spacing:.02em;margin:0;text-wrap:balance}
+h2{font-family:var(--f-display);font-weight:700;font-size:1.1rem;margin:0}
+.lead{color:var(--muted);margin:4px 0 0;max-width:62ch}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.eyebrow{font-size:.75rem;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:.8rem;color:var(--muted);font-weight:500;min-width:0}
+input,select,textarea{font:inherit;font-size:.95rem;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 10px;min-width:0}
+textarea{resize:vertical;min-height:2.4em}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button{font:inherit;font-weight:600;cursor:pointer;border-radius:7px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:7px 14px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.ghost{background:transparent;border-color:transparent;color:var(--muted);padding:6px 8px}
+button.ghost:hover{color:var(--ink)}
+.drop{border:1.5px dashed var(--line);border-radius:10px;padding:18px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;background:var(--sunk)}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop p{margin:0;min-width:0}
+.filemeta{font-size:.85rem;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:.75rem;padding:2px 8px;border-radius:999px;background:var(--sunk);color:var(--muted);border:1px solid var(--line);white-space:nowrap}
+.chip.ok{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.chip.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.chip.ng{background:var(--ng-soft);color:var(--ng);border-color:transparent}
+.chip.acc{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.banner{background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:8px 12px;font-size:.85rem}
+.err{background:var(--ng-soft);color:var(--ng);border-radius:8px;padding:8px 12px;font-size:.85rem}
+.absrow{display:grid;grid-template-columns:minmax(90px,.7fr) minmax(160px,1.6fr) minmax(130px,1fr) minmax(130px,1fr) auto;gap:10px;align-items:end}
+@media (max-width:720px){.absrow{grid-template-columns:1fr 1fr}.absrow .who{grid-column:1 / -1}}
+details summary{cursor:pointer;color:var(--muted);font-size:.85rem;font-weight:600}
+details[open] summary{margin-bottom:10px}
+.settings{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:720px){.settings{grid-template-columns:1fr}}
+.results{display:flex;flex-direction:column;gap:16px}
+.gap{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden;min-width:0}
+.gaphead{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:baseline;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--sunk)}
+.gaphead .when{font-family:var(--f-mono);font-weight:500;font-size:1rem;font-variant-numeric:tabular-nums}
+.shift{font-family:var(--f-display);font-weight:700;font-size:1rem;padding:1px 10px;border-radius:6px;background:var(--accent);color:var(--accent-ink)}
+.gaphead .who{color:var(--muted);font-size:.9rem}
+.gaphead .count{margin-left:auto;font-size:.85rem;color:var(--muted)}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:.72rem;letter-spacing:.06em;color:var(--muted);font-weight:600;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+td.name{font-weight:600;white-space:nowrap}
+td.name small{color:var(--muted);font-weight:400;font-family:var(--f-mono);margin-right:6px}
+.cells{display:flex;gap:4px;font-family:var(--f-mono);font-size:.78rem;font-variant-numeric:tabular-nums}
+.cell{min-width:3.4em;padding:1px 5px;border-radius:4px;background:var(--sunk);color:var(--muted);text-align:center;white-space:nowrap}
+.cell.duty{background:var(--ng-soft);color:var(--ng)}
+.cell.er{background:var(--warn-soft);color:var(--warn)}
+.cell.today{outline:1px solid var(--accent)}
+.note{padding:10px 16px;color:var(--muted);font-size:.85rem}
+.more{padding:8px 16px;border-top:1px solid var(--line)}
+.excluded{padding:8px 16px 12px;border-top:1px solid var(--line)}
+.excluded ul{margin:6px 0 0;padding-left:1.1em;font-size:.82rem;color:var(--muted);columns:2;column-gap:24px}
+@media (max-width:620px){.excluded ul{columns:1}}
+.sched{display:flex;flex-wrap:wrap;gap:6px}
+.sched .d{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.72rem;color:var(--muted)}
+.foot{font-size:.8rem;color:var(--muted);line-height:1.7;max-width:70ch}
+.foot b{color:var(--ink);font-weight:600}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.copied{font-size:.8rem;color:var(--ok)}
+.copybox{width:100%;min-height:8em;font-family:var(--f-mono);font-size:.8rem}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">研修医 当直・ローテ表から</div>
+    <h1>救急欠員の代替候補</h1>
+    <p class="lead">当直・ローテ表(Excel)を読み込み、休む研修医と期間を入れると、空く救急の枠と当直ごとに入れる研修医を一覧にします。当直は同じ学年・同じローテの人から探します。候補を選ぶのは救急科・チーフです。この一覧はその材料です。</p>
+  </header>
+
+  <section class="panel" aria-labelledby="h-file">
+    <h2 id="h-file">1. 表を読み込む</h2>
+    <div class="drop" id="drop">
+      <p><strong>当直・ローテ表(.xlsx / .xlsm)</strong><br><span class="filemeta" id="filemeta">ファイルはこのブラウザの中だけで読み込みます。どこにも送信・保存しません。</span></p>
+      <div class="row">
+        <input type="file" id="file" accept=".xlsx,.xlsm,.xls" hidden>
+        <button class="primary" id="pick" type="button">ファイルを選ぶ</button>
+      </div>
+    </div>
+    <div id="loadmsg" hidden></div>
+    <div class="chips" id="sheetchips"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-abs">
+    <div class="toolbar">
+      <h2 id="h-abs">2. 休む研修医と期間</h2>
+      <button class="ghost" id="addabs" type="button">＋ 休む人を追加</button>
+    </div>
+    <div id="absrows" style="display:flex;flex-direction:column;gap:12px"></div>
+    <details>
+      <summary>判定の設定</summary>
+      <div class="settings">
+        <label class="f">研修医を出せない科(ローテ名に含む語、カンマ区切り)
+          <input id="kw-refuse" value="小児科,新生児,NICU"></label>
+        <label class="f">院外・離島など(ローテ名に含む語、カンマ区切り)
+          <input id="kw-off" value="地域,北部,南部,宮古,八重山,院外,県外,離島,飯塚,仙台,杏林,丸太町,国がん,成育,座間味,ハワイ,療育"></label>
+        <label class="f">個別に外す人(名前をカンマ区切り。すでに代わりに入った人など)
+          <input id="kw-person" placeholder="例:村井 亮太, 種本 凌"></label>
+        <label class="f">候補を探す範囲
+          <select id="scope"><option value="same">休む人と同じ学年</option><option value="all">読み込んだ全学年</option></select></label>
+      </div>
+    </details>
+    <div class="row"><button class="primary" id="run" type="button">候補を出す</button><span class="filemeta" id="runmsg"></span></div>
+  </section>
+
+  <section aria-labelledby="h-res" class="results">
+    <div class="toolbar">
+      <h2 id="h-res">3. 空く枠と候補</h2>
+      <div class="row"><span class="copied" id="copied" hidden>コピーしました</span><button id="copy" type="button">一覧をテキストでコピー</button></div>
+    </div>
+    <div id="sampleflag" class="banner" hidden>サンプル表示中です。名前はすべて架空です。表を読み込むと実際の候補に切り替わります。</div>
+    <div id="results"></div>
+    <textarea id="copyfallback" class="copybox" hidden readonly aria-label="コピー用テキスト"></textarea>
+  </section>
+
+  <section class="panel">
+    <h2>判定のしかた</h2>
+    <div class="foot">
+      <b>空く枠</b>:休む人のその日のセルが 早・日・準・深・NF を含むと救急の枠(早番・日勤・準夜・深夜)として数えます。ローテが「救急日」「ER日勤」でセルが空欄の平日は、日勤とみなします。●があれば当直の枠として数えます。<br>
+      <b>当直の候補</b>:休む人と同じ学年で、その日に同じローテを回っている人から探します(「v/」付きのローテも同じ科として扱います)。当日すでに当直・救急勤務がある人、前日か翌日も当直の人(連続当直)、前日に救急深夜の人、当直明けに救急の早番・日勤がある人は外します。出せない科の設定は当直には使いません。<br>
+      <b>外す人</b>:休み登録のある人/救急ローテ中/出せない科・院外のローテ中/当日すでに救急勤務か当直(●)がある/前日が当直(当直明け)/早番・日勤の前夜に救急の準夜・深夜/準夜の前日に深夜・翌日に早番/深夜の翌日に救急勤務か当直/早番・日勤の日に外来。<br>
+      <b>並び順</b>:注意点の少ない順、前後3日の救急勤務と当直の回数が少ない順です。<br>
+      表の見方が病院の実際の運用と違うとき(当直の時間帯、早番と当直の組み合わせを認めるかなど)は、最終判断で補ってください。
+    </div>
+  </section>
+</div>
+
+<script src="vendor/xlsx.full.min.js"></script>
+<script id="core">
+/* ===== core logic (no DOM) ===== */
+const DAY_MS = 86400000;
+const SHIFT_LABEL = {early:'早番', day:'日勤', evening:'準夜', night:'深夜', duty:'当直'};
+const SHIFT_ORDER = {early:0, day:1, evening:2, night:3, duty:4};
+function isoFromSerial(n){ return new Date(Math.round((n - 25569) * DAY_MS)).toISOString().slice(0,10); }
+function isoAdd(iso,k){ const d = new Date(iso+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()+k); return d.toISOString().slice(0,10); }
+function dow(iso){ return '日月火水木金土'[new Date(iso+'T00:00:00Z').getUTCDay()]; }
+function md(iso){ const p = iso.split('-'); return (+p[1])+'/'+(+p[2]); }
+function mdw(iso){ return md(iso)+'('+dow(iso)+')'; }
+function serialOf(v){
+  if (typeof v === 'number' && v > 40000 && v < 80000) return Math.floor(v);
+  if (v instanceof Date && !isNaN(v)) return Math.floor(v.getTime()/DAY_MS + 25569);
+  return null;
+}
+function normName(s){ return String(s||'').replace(/[\s　]+/g,'').replace(/[眞]/g,'真').replace(/[髙]/g,'高').replace(/[﨑]/g,'崎'); }
+function splitKw(s){ return String(s||'').split(/[,、，\n]/).map(x=>x.trim()).filter(Boolean); }
+
+function parseSheet(sheetName, rows, date1904){
+  const off = date1904 ? 1462 : 0;
+  let h = -1, nameCol = -1;
+  for (let r = 0; r < Math.min(rows.length, 15) && h < 0; r++){
+    const row = rows[r] || [];
+    for (let c = 0; c < row.length; c++){
+      if (typeof row[c] === 'string' && row[c].replace(/[\s　]/g,'') === '氏名'){ h = r; nameCol = c; break; }
+    }
+  }
+  if (h < 0) return null;
+  let best = -1, bestCount = 0;
+  for (let r = 0; r <= h; r++){
+    const row = rows[r] || []; let cnt = 0;
+    for (let c = nameCol+1; c < row.length; c++) if (serialOf(row[c]) != null) cnt++;
+    if (cnt > bestCount){ bestCount = cnt; best = r; }
+  }
+  if (bestCount < 3) return null;
+  const drow = rows[best]; const cand = [];
+  for (let c = nameCol+1; c < drow.length; c++){ const s = serialOf(drow[c]); if (s != null) cand.push({c, s}); }
+  const sorted = cand.map(x=>x.s).sort((a,b)=>a-b); const med = sorted[Math.floor(sorted.length/2)];
+  const dayCols = []; let lastS = -Infinity;
+  for (const x of cand){ if (Math.abs(x.s - med) <= 45 && x.s > lastS){ lastS = x.s; dayCols.push({c:x.c, iso:isoFromSerial(x.s + off)}); } }
+  if (dayCols.length < 3) return null;
+  const daySet = new Set(dayCols.map(d=>d.c)); const maxDay = Math.max(...dayCols.map(d=>d.c));
+  const medYear = +isoFromSerial(med + off).slice(0,4);
+  const labelCols = [];
+  for (let c = nameCol+1; c <= maxDay; c++){
+    if (daySet.has(c)) continue;
+    for (let r = 0; r <= h; r++){
+      const s = serialOf((rows[r]||[])[c]); if (s == null) continue;
+      const iso = isoFromSerial(s + off);
+      const proj = Date.UTC(medYear, +iso.slice(5,7)-1, +iso.slice(8,10))/DAY_MS + 25569;
+      if (Math.abs(proj - (med + off)) <= 60){ labelCols.push(c); break; }
+    }
+  }
+  const labelSet = new Set(labelCols);
+  const residents = [];
+  for (let r = h+1; r < rows.length; r++){
+    const row = rows[r] || []; const nm = row[nameCol];
+    if (typeof nm !== 'string' || !nm.trim() || /氏名/.test(nm)) continue;
+    let no = '';
+    for (let c = 0; c < nameCol; c++){ const v = row[c]; if (v != null && /^\d+$/.test(String(v).trim())) no = String(v).trim(); }
+    const cells = {}, labels = {};
+    for (const d of dayCols){
+      const v = row[d.c]; cells[d.iso] = v == null ? '' : String(v).trim();
+      const left = labelCols.filter(lc => lc < d.c); let lab = '';
+      if (left.length){
+        const L = left[left.length-1]; const tryCols = [L]; if (labelSet.has(L-1)) tryCols.push(L-1);
+        for (const lc of tryCols){ const lv = row[lc]; if (lv != null && String(lv).trim()){ lab = String(lv).trim().replace(/\s+/g,' '); break; } }
+      }
+      labels[d.iso] = lab;
+    }
+    residents.push({no, name: nm.trim().replace(/[\s　]+/g,' '), key: normName(nm), cells, labels, grade: sheetName});
+  }
+  if (!residents.length) return null;
+  return {name: sheetName, days: dayCols.map(d=>d.iso).sort(), residents};
+}
+
+const OFF_RE = /バケ|年休|体調不良|夏季休|育休|病休|欠勤|^休|^[Vv]$/;
+function isOff(code){ return !!code && OFF_RE.test(code); }
+function hasDuty(code){ return /●/.test(code||''); }
+function erShifts(code){
+  const out = []; if (!code || isOff(code)) return out;
+  if (/NF/i.test(code) || /深/.test(code)) out.push('night');
+  if (/準/.test(code)) out.push('evening');
+  if (/早/.test(code)) out.push('early');
+  if (/日/.test(code) && !/日直/.test(code)) out.push('day');
+  return out;
+}
+function isErRotation(lab){ return /救急|ER|^NF|\/NF|NF\//.test(lab||''); }
+function isWeekday(iso){ const g = new Date(iso+'T00:00:00Z').getUTCDay(); return g >= 1 && g <= 5; }
+
+function gapsFor(person, from, to){
+  const out = [];
+  for (let d = from; d <= to; d = isoAdd(d,1)){
+    if (!(d in person.cells)) continue;
+    const code = person.cells[d]; const lab = person.labels[d] || '';
+    let shifts = erShifts(code); let implicit = false;
+    if (!code && /ER日勤|救急日/.test(lab) && isWeekday(d)){ shifts = ['day']; implicit = true; }
+    for (const s of shifts) out.push({date:d, shift:s, code: code || lab, implicit, who: person});
+    if (hasDuty(code)) out.push({date:d, shift:'duty', code, implicit:false, who: person});
+  }
+  return out;
+}
+
+function evaluate(p, gap, ctx){
+  const d = gap.date, s = gap.shift, prev = isoAdd(d,-1), next = isoAdd(d,1);
+  if (p.key === gap.who.key && p.grade === gap.who.grade) return {ex:'本人'};
+  if (!(d in p.cells)) return {ex:'この日が表にない'};
+  if (ctx.absentOn(p, d)) return {ex:'休み登録あり'};
+  if (ctx.person.some(k => k && p.key.includes(k))) return {ex:'個別に除外'};
+  const lab = p.labels[d] || '';
+  if (isErRotation(lab)) return {ex:'救急ローテ中'};
+  if (ctx.refuse.some(k => lab.includes(k))) return {ex:'出せない科のローテ中'};
+  if (ctx.off.some(k => lab.includes(k))) return {ex:'院外・離島など'};
+  if (/^[Vv]$|休/.test(lab)) return {ex:'休暇・休職中'};
+  const today = p.cells[d] || '', pv = p.cells[prev], nx = p.cells[next];
+  if (isOff(today)) return {ex:'当日休み'};
+  if (erShifts(today).length) return {ex:'当日すでに救急勤務'};
+  if (hasDuty(today)) return {ex:'当日当直あり'};
+  const warns = [];
+  if (pv !== undefined){
+    if (hasDuty(pv)) return {ex:'当直明け'};
+    const pe = erShifts(pv);
+    if ((s==='early'||s==='day') && (pe.includes('night')||pe.includes('evening'))) return {ex:'前夜に救急夜勤'};
+    if (s==='evening' && pe.includes('night')) return {ex:'前日に救急深夜'};
+    if (s==='night' && pe.includes('night')) warns.push('前日も救急深夜');
+    else if (pe.length) warns.push('前日も救急勤務');
+  } else warns.push('前日の予定が表にない');
+  if (nx !== undefined){
+    const ne = erShifts(nx);
+    if (s==='evening' && ne.includes('early')) return {ex:'翌日に早番'};
+    if (s==='night' && (ne.length || hasDuty(nx))) return {ex:'翌日に救急勤務・当直'};
+    if (hasDuty(nx)) warns.push('翌日に当直');
+    if (ne.length) warns.push('翌日も救急勤務');
+  }
+  if (today){
+    if (/外来/.test(today)){ if (s==='early'||s==='day') return {ex:'当日外来'}; warns.push('当日外来'); }
+    else if (s==='early'||s==='day') warns.push('当日予定:'+today);
+  }
+  if (ctx.absentOn(p, prev) || ctx.absentOn(p, isoAdd(d,-2))) warns.push('直前まで休み(体調確認)');
+  let load = 0;
+  for (let k = -3; k <= 3; k++){ if (!k) continue; const c = p.cells[isoAdd(d,k)]; if (c && (erShifts(c).length || hasDuty(c))) load++; }
+  return {ok:true, warns, load, lab};
+}
+
+function baseRotation(lab){
+  return String(lab||'').split('/').map(x=>x.trim()).filter(x=>x && !/^[Vv]$|^バケ/.test(x)).join('/').replace(/\s+/g,'');
+}
+function sameRotation(a, b){
+  const A = baseRotation(a), B = baseRotation(b); if (!A || !B) return false;
+  if (A === B) return true;
+  const as = A.split('/'), bs = B.split('/');
+  return as.some(x => bs.includes(x));
+}
+function evaluateDuty(p, gap, ctx){
+  const d = gap.date, prev = isoAdd(d,-1), next = isoAdd(d,1);
+  if (p.key === gap.who.key && p.grade === gap.who.grade) return {ex:'本人'};
+  if (!(d in p.cells)) return {ex:'この日が表にない'};
+  if (ctx.absentOn(p, d)) return {ex:'休み登録あり'};
+  if (ctx.person.some(k => k && p.key.includes(k))) return {ex:'個別に除外'};
+  const lab = p.labels[d] || '';
+  if (ctx.off.some(k => lab.includes(k))) return {ex:'院外・離島など'};
+  if (/^[Vv]$|休/.test(lab)) return {ex:'休暇・休職中'};
+  const today = p.cells[d] || '', pv = p.cells[prev], nx = p.cells[next];
+  if (isOff(today)) return {ex:'当日休み'};
+  if (hasDuty(today)) return {ex:'当日すでに当直'};
+  if (erShifts(today).length) return {ex:'当日救急勤務'};
+  const warns = [];
+  if (pv !== undefined){
+    if (hasDuty(pv)) return {ex:'前日も当直(連続当直)'};
+    const pe = erShifts(pv);
+    if (pe.includes('night')) return {ex:'前日に救急深夜'};
+    if (pe.includes('evening')) warns.push('前日に救急準夜');
+  } else warns.push('前日の予定が表にない');
+  if (nx !== undefined){
+    if (hasDuty(nx)) return {ex:'翌日も当直(連続当直)'};
+    const ne = erShifts(nx);
+    if (ne.includes('early') || ne.includes('day')) return {ex:'当直明けに救急勤務'};
+    if (ne.length) warns.push('翌日に救急'+ne.map(s=>SHIFT_LABEL[s]).join('・'));
+    if (isOff(nx)) {} else if (nx && /外来/.test(nx)) warns.push('翌日外来');
+  } else warns.push('翌日の予定が表にない');
+  if (ctx.absentOn(p, prev) || ctx.absentOn(p, isoAdd(d,-2))) warns.push('直前まで休み(体調確認)');
+  let load = 0;
+  for (let k = -3; k <= 3; k++){ if (!k) continue; const c = p.cells[isoAdd(d,k)]; if (c && (erShifts(c).length || hasDuty(c))) load++; }
+  return {ok:true, warns, load, lab};
+}
+
+function computeGaps(sheets, absences, settings){
+  const ctx = {
+    refuse: splitKw(settings.refuse), off: splitKw(settings.off), person: splitKw(settings.person).map(normName),
+    absentOn(p, d){ return absences.some(a => a.person.key === p.key && a.person.grade === p.grade && d >= a.from && d <= a.to); }
+  };
+  const gaps = [];
+  for (const a of absences){ for (const g of gapsFor(a.person, a.from, a.to)) gaps.push(g); }
+  gaps.sort((x,y)=> x.date < y.date ? -1 : x.date > y.date ? 1 : SHIFT_ORDER[x.shift]-SHIFT_ORDER[y.shift]);
+  for (const g of gaps){
+    if (g.shift === 'duty'){
+      const rot = g.who.labels[g.date] || ''; g.rotation = baseRotation(rot);
+      const grade = (sheets.find(s=>s.name===g.who.grade)||{residents:[]}).residents;
+      const ok = [], ex = [];
+      for (const p of grade){
+        if (p.key === g.who.key) continue;
+        if (!sameRotation(p.labels[g.date], rot)) continue;
+        const r = evaluateDuty(p, g, ctx); if (r.ok) ok.push({p, ...r}); else ex.push({p, reason:r.ex});
+      }
+      ok.sort((a,b)=> a.warns.length-b.warns.length || a.load-b.load || (+a.p.no||999)-(+b.p.no||999));
+      g.candidates = ok; g.excluded = ex; continue;
+    }
+    const pool = settings.scope === 'all' ? sheets.flatMap(s=>s.residents) : (sheets.find(s=>s.name===g.who.grade)||{residents:[]}).residents;
+    const ok = [], ex = [];
+    for (const p of pool){ const r = evaluate(p, g, ctx); if (r.ok) ok.push({p, ...r}); else if (r.ex !== '本人') ex.push({p, reason:r.ex}); }
+    ok.sort((a,b)=> a.warns.length-b.warns.length || a.load-b.load || (+a.p.no||999)-(+b.p.no||999));
+    g.candidates = ok; g.excluded = ex;
+  }
+  return gaps;
+}
+if (typeof module !== 'undefined') module.exports = {parseSheet, computeGaps, gapsFor, evaluate, isoAdd};
+</script>
+<script>
+/* ===== UI ===== */
+const $ = id => document.getElementById(id);
+let SHEETS = []; let IS_SAMPLE = true; let LAST = [];
+
+function sampleSheets(){
+  const days = []; for (let d = '2026-10-05'; d <= '2026-10-11'; d = isoAdd(d,1)) days.push(d);
+  const mk = (no, name, lab, cells) => { const c = {}, l = {}; days.forEach((d,i)=>{ c[d] = cells[i]||''; l[d] = lab; }); return {no:String(no), name, key:normName(name), cells:c, labels:l, grade:'1年次'}; };
+  const R = [
+    mk(1,'見本 一花','救急日',['早番','早番','早番','','早番','','']),
+    mk(2,'見本 次郎','救急準',['準夜','準夜','','準夜','準夜','準夜','']),
+    mk(3,'見本 三紀','救急深',['深夜','','深夜','深夜','深夜','','深夜']),
+    mk(4,'見本 四郎','MT',['','●','','','','','●']),
+    mk(5,'見本 五月','産婦',['●','','','','●','','']),
+    mk(6,'見本 六太','麻酔',['','','','●','','','']),
+    mk(7,'見本 七海','小児科',['','','','','','','']),
+    mk(8,'見本 八雲','GI',['','','●','','','日','']),
+    mk(9,'見本 九実','産婦',['','','','','','●','']),
+    mk(10,'見本 十和','一般外科',['','外来','','','','','']),
+    mk(11,'見本 百合','地域',['','','','','','','']),
+    mk(12,'見本 千尋','Nephro',['','','','日','','','']),
+  ];
+  return [{name:'1年次', days, residents:R}];
+}
+
+function sheetOptions(sel, current){
+  sel.innerHTML = SHEETS.map(s=>`<option value="${esc(s.name)}"${s.name===current?' selected':''}>${esc(s.name)}</option>`).join('');
+}
+function esc(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+let absSeq = 0;
+function addAbsRow(pref){
+  const id = ++absSeq; const sheet = SHEETS[0]; const first = sheet ? sheet.days[0] : '';
+  const wrap = document.createElement('div'); wrap.className = 'absrow'; wrap.dataset.id = id;
+  wrap.innerHTML = `
+    <label class="f">学年<select id="g${id}"></select></label>
+    <label class="f who">名前 または 番号<input id="p${id}" list="dl${id}" placeholder="例:25 または 小原"><datalist id="dl${id}"></datalist></label>
+    <label class="f">休み開始<input type="date" id="f${id}"></label>
+    <label class="f">休み終了<input type="date" id="t${id}"></label>
+    <button class="ghost" type="button" aria-label="この行を削除" id="x${id}">削除</button>`;
+  $('absrows').appendChild(wrap);
+  const g = $('g'+id); sheetOptions(g, pref && pref.grade || (sheet && sheet.name));
+  const fill = () => { const s = SHEETS.find(x=>x.name===g.value); $('dl'+id).innerHTML = s ? s.residents.map(r=>`<option value="${esc((r.no?r.no+' ':'')+r.name)}">${esc(r.labels[s.days[0]]||'')}</option>`).join('') : '';
+    if (s){ ['f','t'].forEach(k=>{ $(k+id).min = s.days[0]; $(k+id).max = s.days[s.days.length-1]; }); } };
+  g.addEventListener('change', fill); fill();
+  $('p'+id).value = pref && pref.who || '';
+  $('f'+id).value = pref && pref.from || first; $('t'+id).value = pref && pref.to || first;
+  $('x'+id).addEventListener('click', ()=>{ wrap.remove(); if (!$('absrows').children.length) addAbsRow(); });
+}
+
+function resolvePerson(sheet, text){
+  const t = String(text||'').trim(); if (!t || !sheet) return null;
+  const num = t.match(/^(\d+)(?:\s|$)/); const rest = normName(t.replace(/^\d+\s*/,''));
+  if (num && !rest){ return sheet.residents.find(r=>r.no===num[1]) || null; }
+  if (rest){ const hit = sheet.residents.filter(r=>r.key.includes(rest)); if (hit.length === 1) return hit[0]; if (num){ const h2 = hit.find(r=>r.no===num[1]); if (h2) return h2; } return hit.length ? {ambiguous: hit} : null; }
+  return null;
+}
+
+function readAbsences(){
+  const out = [], errs = [];
+  for (const row of $('absrows').children){
+    const id = row.dataset.id; const sheet = SHEETS.find(s=>s.name===$('g'+id).value);
+    const txt = $('p'+id).value; if (!txt.trim()) continue;
+    const p = resolvePerson(sheet, txt);
+    if (!p){ errs.push(`「${txt}」が${sheet?sheet.name:''}に見つかりません。番号か名前を確認してください。`); continue; }
+    if (p.ambiguous){ errs.push(`「${txt}」に当てはまる人が複数います(${p.ambiguous.map(r=>r.name).join('、')})。番号で指定してください。`); continue; }
+    let f = $('f'+id).value, t = $('t'+id).value;
+    if (!f || !t){ errs.push(`${p.name}の休み期間を入れてください。`); continue; }
+    if (t < f){ const x = f; f = t; t = x; }
+    out.push({person:p, from:f, to:t});
+  }
+  return {out, errs};
+}
+
+function cellClass(c){ if (!c) return 'cell'; if (hasDuty(c)) return 'cell duty'; if (erShifts(c).length) return 'cell er'; return 'cell'; }
+function miniCells(p, d){
+  return `<div class="cells">${[-1,0,1].map(k=>{ const dd = isoAdd(d,k); const c = p.cells[dd]; const v = c===undefined ? '—' : (c || '・');
+    return `<span class="${cellClass(c)}${k===0?' today':''}" title="${mdw(dd)}">${esc(v)}</span>`; }).join('')}</div>`;
+}
+
+function render(){
+  const settings = {refuse:$('kw-refuse').value, off:$('kw-off').value, person:$('kw-person').value, scope:$('scope').value};
+  const {out, errs} = readAbsences();
+  const res = $('results'); $('copyfallback').hidden = true;
+  if (errs.length){ res.innerHTML = errs.map(e=>`<div class="err">${esc(e)}</div>`).join(''); $('runmsg').textContent=''; LAST=[]; return; }
+  if (!out.length){ res.innerHTML = `<div class="panel"><p style="margin:0;color:var(--muted)">休む研修医と期間を入れて「候補を出す」を押してください。</p></div>`; LAST=[]; return; }
+  const gaps = computeGaps(SHEETS, out, settings); LAST = gaps;
+  const sched = out.map(a=>{
+    const ds = []; for (let d=a.from; d<=a.to; d=isoAdd(d,1)) if (d in a.person.cells) ds.push(d);
+    return `<div class="panel" style="gap:8px"><div class="toolbar"><div><strong>${esc(a.person.name)}</strong> <span class="filemeta">${esc(a.person.grade)} ・ ${esc(a.person.labels[a.from]||'')} ・ ${mdw(a.from)}〜${mdw(a.to)}</span></div></div>
+      <div class="sched">${ds.map(d=>`<div class="d"><span>${mdw(d)}</span><span class="${cellClass(a.person.cells[d])}">${esc(a.person.cells[d]||'・')}</span></div>`).join('') || '<span class="filemeta">この期間は表の範囲外です。</span>'}</div></div>`;
+  }).join('');
+  if (!gaps.length){ res.innerHTML = sched + `<div class="panel"><p style="margin:0">この期間、救急の勤務と当直は入っていません。代わりを探す必要はありません。</p></div>`; $('runmsg').textContent=''; return; }
+  const blocks = gaps.map((g,i)=>{
+    const head = `<div class="gaphead"><span class="when">${mdw(g.date)}</span><span class="shift">${SHIFT_LABEL[g.shift]}</span><span class="who">${esc(g.who.name)} の枠(${esc(g.code)}${g.implicit?'・ローテから推定':''})</span>`;
+    const dutyNote = g.shift === 'duty' ? `<div class="note">同じ学年(${esc(g.who.grade)})で、同じローテ(${esc(g.rotation||'—')})を回っている人から探しています。</div>` : '';
+    const n = g.candidates.length; const shown = g.candidates.slice(0,8);
+    const rows = shown.map(c=>`<tr><td class="name"><small>${esc(c.p.no)}</small>${esc(c.p.name)}${SHEETS.length>1&&$('scope').value==='all'?` <span class="chip">${esc(c.p.grade)}</span>`:''}</td>
+      <td>${esc(c.lab||'—')}</td><td>${miniCells(c.p, g.date)}</td>
+      <td><div class="chips">${c.warns.length?c.warns.map(w=>`<span class="chip warn">${esc(w)}</span>`).join(''):'<span class="chip ok">問題なし</span>'}${c.load?`<span class="chip">前後3日 ${c.load}件</span>`:''}</div></td></tr>`).join('');
+    const rest = g.candidates.slice(8);
+    const restHtml = rest.length ? `<details class="more"><summary>ほかの候補 ${rest.length}人</summary><div class="chips" style="margin-top:6px">${rest.map(c=>`<span class="chip${c.warns.length?' warn':''}">${esc(c.p.name)}(${esc(c.lab||'—')})</span>`).join('')}</div></details>` : '';
+    const byReason = {}; g.excluded.forEach(e=>{ (byReason[e.reason] = byReason[e.reason] || []).push(e.p.name); });
+    const exHtml = `<details class="excluded"><summary>外した人 ${g.excluded.length}人と理由</summary><ul>${Object.entries(byReason).map(([r,ns])=>`<li><b>${esc(r)}</b>:${esc(ns.join('、'))}</li>`).join('')}</ul></details>`;
+    return `<article class="gap">${head}<span class="count">候補 ${n}人</span></div>${dutyNote}
+      ${n ? `<div class="tablewrap"><table><thead><tr><th>名前</th><th>ローテ</th><th>前日・当日・翌日</th><th>注意点</th></tr></thead><tbody>${rows}</tbody></table></div>${restHtml}` : `<div class="note">${g.shift==='duty' ? '同じローテで条件に合う研修医がいません。科の上級医での対応か、別のローテからの依頼を検討してください。' : '条件に合う研修医がいません。救急科の上級医での対応を検討してください。'}</div>`}
+      ${exHtml}</article>`;
+  }).join('');
+  res.innerHTML = sched + blocks;
+  const open = gaps.filter(g=>g.shift!=='duty').length;
+  $('runmsg').textContent = `空く救急の枠 ${open}件`;
+}
+
+function summaryText(){
+  if (!LAST.length) return '';
+  const lines = ['【救急欠員 代替候補】'];
+  for (const g of LAST){
+    lines.push(`■${mdw(g.date)} ${SHIFT_LABEL[g.shift]}(${g.who.name} の枠)`);
+    if (g.shift === 'duty') lines.push(`  (同学年・同じローテ ${g.rotation||'—'} から)`);
+    if (!g.candidates.length){ lines.push('  候補なし'); continue; }
+    lines.push('  候補:' + g.candidates.slice(0,6).map(c=>`${c.p.name}(${c.lab||'—'}${c.warns.length?'・'+c.warns.join('/'):''})`).join('、'));
+  }
+  lines.push('※当直・ローテ表から自動で絞った候補。最終判断は救急科・チーフ。');
+  return lines.join('\n');
+}
+
+function loadWorkbook(buf, fname){
+  const wb = XLSX.read(buf, {type:'array'});
+  const hidden = new Set(((wb.Workbook||{}).Sheets||[]).filter(s=>s.Hidden).map(s=>s.name));
+  const d1904 = !!(((wb.Workbook||{}).WBProps||{}).date1904);
+  const sheets = [];
+  for (const n of wb.SheetNames){
+    if (hidden.has(n) || !/年次/.test(n) || /集計/.test(n)) continue;
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[n], {header:1, raw:true, defval:null, blankrows:true});
+    const s = parseSheet(n.trim(), rows, d1904); if (s) sheets.push(s);
+  }
+  if (!sheets.length) throw new Error('「氏名」の列と日付の行がある学年のシートが見つかりませんでした。当直・ローテ表のファイルか確認してください。');
+  return sheets;
+}
+
+async function handleFile(file){
+  const msg = $('loadmsg'); msg.hidden = false; msg.className = 'filemeta'; msg.textContent = '読み込み中…';
+  try{
+    if (typeof XLSX === 'undefined') throw new Error('Excelを読む部品が読み込めませんでした。ページを再読み込みしてください。');
+    const buf = await file.arrayBuffer();
+    SHEETS = loadWorkbook(buf, file.name); IS_SAMPLE = false;
+    $('filemeta').textContent = file.name;
+    $('sheetchips').innerHTML = SHEETS.map(s=>`<span class="chip acc">${esc(s.name)} ${s.residents.length}人 ・ ${md(s.days[0])}〜${md(s.days[s.days.length-1])}</span>`).join('');
+    msg.hidden = true; $('sampleflag').hidden = true;
+    $('absrows').innerHTML = ''; addAbsRow();
+    $('results').innerHTML = `<div class="panel"><p style="margin:0;color:var(--muted)">表を読み込みました。休む研修医と期間を入れて「候補を出す」を押してください。</p></div>`; LAST = [];
+  }catch(e){ msg.className = 'err'; msg.textContent = e.message || String(e); }
+}
+
+$('pick').addEventListener('click', ()=>$('file').click());
+$('file').addEventListener('change', e=>{ const f = e.target.files[0]; if (f) handleFile(f); e.target.value=''; });
+const drop = $('drop');
+['dragenter','dragover'].forEach(t=>drop.addEventListener(t, e=>{ e.preventDefault(); drop.classList.add('over'); }));
+['dragleave','drop'].forEach(t=>drop.addEventListener(t, e=>{ e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e=>{ const f = e.dataTransfer.files[0]; if (f) handleFile(f); });
+$('addabs').addEventListener('click', ()=>addAbsRow());
+$('run').addEventListener('click', render);
+$('copy').addEventListener('click', async ()=>{
+  const t = summaryText(); if (!t) return;
+  try{ await navigator.clipboard.writeText(t); $('copied').hidden = false; setTimeout(()=>$('copied').hidden = true, 1800); }
+  catch(_){ const ta = $('copyfallback'); ta.value = t; ta.hidden = false; ta.focus(); ta.select(); }
+});
+
+SHEETS = sampleSheets();
+$('sheetchips').innerHTML = '<span class="chip">サンプル:1年次 12人(架空)</span>';
+$('sampleflag').hidden = false;
+addAbsRow({grade:'1年次', who:'1 見本 一花', from:'2026-10-05', to:'2026-10-07'});
+addAbsRow({grade:'1年次', who:'5 見本 五月', from:'2026-10-05', to:'2026-10-05'});
+render();
+</script>
+
+</body>
+</html>
