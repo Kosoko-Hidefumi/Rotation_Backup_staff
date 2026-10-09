@@ -115,7 +115,7 @@ td.name small{color:var(--muted);font-weight:400;font-family:var(--f-mono);margi
   <section class="panel" aria-labelledby="h-file">
     <h2 id="h-file">1. 表を読み込む</h2>
     <div class="drop" id="drop">
-      <p><strong>当直・ローテ表(.xlsx / .xlsm)</strong><br><span class="filemeta" id="filemeta">ファイルはこのブラウザの中だけで読み込みます。どこにも送信・保存しません。</span></p>
+      <p><strong>当直・ローテ表(.xlsx / .xlsm)</strong><br><span class="filemeta" id="filemeta">ファイルはこのブラウザの中だけで読み込みます。どこにも送信しません。このタブを閉じると消えます。</span></p>
       <div class="row">
         <input type="file" id="file" accept=".xlsx,.xlsm,.xls" hidden>
         <button class="primary" id="pick" type="button">ファイルを選ぶ</button>
@@ -520,6 +520,36 @@ function miniCells(p, d){
     return `<span class="${cellClass(c)}${k===0?' today':''}" title="${mdw(dd)}">${esc(v)}</span>`; }).join('')}</div>`;
 }
 
+// タブが再読み込みされても作業が消えないよう、このタブの中(sessionStorage)にだけ控えておく。タブを閉じると消える。
+const STATE_KEY = 'rbs-state-v1';
+let FILE_NAME = '';
+function saveState(){
+  if (IS_SAMPLE) return;
+  try{
+    const rows = [...$('absrows').children].map(r=>{ const id = r.dataset.id; return {grade:$('g'+id).value, who:$('p'+id).value, from:$('f'+id).value, to:$('t'+id).value}; });
+    const settings = {refuse:$('kw-refuse').value, off:$('kw-off').value, person:$('kw-person').value, scope:$('scope').value};
+    sessionStorage.setItem(STATE_KEY, JSON.stringify({fname:FILE_NAME, sheets:SHEETS, rows, settings, ran:!!LAST.length}));
+  }catch(_){ /* 保存できなくても動作には影響しない */ }
+}
+function showSheetChips(){
+  $('sheetchips').innerHTML = SHEETS.map(s=>`<span class="chip acc">${esc(s.name)} ${s.residents.length}人 ・ ${md(s.days[0])}〜${md(s.days[s.days.length-1])}</span>`).join('');
+}
+function restoreState(){
+  let st = null;
+  try{ st = JSON.parse(sessionStorage.getItem(STATE_KEY) || 'null'); }catch(_){ st = null; }
+  if (!st || !Array.isArray(st.sheets) || !st.sheets.length) return false;
+  SHEETS = st.sheets; IS_SAMPLE = false; FILE_NAME = st.fname || '';
+  $('filemeta').textContent = FILE_NAME; showSheetChips(); $('sampleflag').hidden = true;
+  const set = st.settings || {};
+  ['refuse','off','person'].forEach(k=>{ if (typeof set[k] === 'string') $('kw-'+k).value = set[k]; });
+  if (set.scope) $('scope').value = set.scope;
+  $('absrows').innerHTML = '';
+  (st.rows && st.rows.length ? st.rows : [null]).forEach(r=>addAbsRow(r || undefined));
+  if (st.ran) render();
+  else $('results').innerHTML = `<div class="panel"><p style="margin:0;color:var(--muted)">表を読み込みました。休む研修医と期間を入れて「候補を出す」を押してください。</p></div>`;
+  return true;
+}
+
 function render(){
   const settings = {refuse:$('kw-refuse').value, off:$('kw-off').value, person:$('kw-person').value, scope:$('scope').value};
   const {out, errs} = readAbsences();
@@ -532,7 +562,7 @@ function render(){
     return `<div class="panel" style="gap:8px"><div class="toolbar"><div><strong>${esc(a.person.name)}</strong> <span class="filemeta">${esc(a.person.grade)} ・ ${esc(a.person.labels[a.from]||'')} ・ ${mdw(a.from)}〜${mdw(a.to)}</span></div></div>
       <div class="sched">${ds.map(d=>`<div class="d"><span>${mdw(d)}</span><span class="${cellClass(a.person.cells[d])}">${esc(a.person.cells[d]||'・')}</span></div>`).join('') || '<span class="filemeta">この期間は表の範囲外です。</span>'}</div></div>`;
   }).join('');
-  if (!gaps.length){ res.innerHTML = sched + `<div class="panel"><p style="margin:0">この期間、救急の勤務と当直は入っていません。代わりを探す必要はありません。</p></div>`; $('runmsg').textContent=''; return; }
+  if (!gaps.length){ res.innerHTML = sched + `<div class="panel"><p style="margin:0">この期間、救急の勤務と当直は入っていません。代わりを探す必要はありません。</p></div>`; $('runmsg').textContent=''; saveState(); return; }
   const blocks = gaps.map((g,i)=>{
     const head = `<div class="gaphead"><span class="when">${mdw(g.date)}</span><span class="shift">${SHIFT_LABEL[g.shift]}</span><span class="who">${esc(g.who.name)} の枠(${esc(g.code)}${g.implicit?'・ローテから推定':''})</span>`;
     const dutyNote = g.shift === 'duty' ? `<div class="note">同じ学年(${esc(g.who.grade)})で、同じローテ(${esc(g.rotation||'—')})を回っている人から探しています。</div>` : '';
@@ -551,6 +581,7 @@ function render(){
   res.innerHTML = sched + blocks;
   const open = gaps.filter(g=>g.shift!=='duty').length;
   $('runmsg').textContent = `空く救急の枠 ${open}件`;
+  saveState();
 }
 
 function summaryText(){
@@ -585,12 +616,13 @@ async function handleFile(file){
   try{
     if (typeof XLSX === 'undefined') throw new Error('Excelを読む部品が読み込めませんでした。ページを再読み込みしてください。');
     const buf = await file.arrayBuffer();
-    SHEETS = loadWorkbook(buf, file.name); IS_SAMPLE = false;
+    SHEETS = loadWorkbook(buf, file.name); IS_SAMPLE = false; FILE_NAME = file.name;
     $('filemeta').textContent = file.name;
-    $('sheetchips').innerHTML = SHEETS.map(s=>`<span class="chip acc">${esc(s.name)} ${s.residents.length}人 ・ ${md(s.days[0])}〜${md(s.days[s.days.length-1])}</span>`).join('');
+    showSheetChips();
     msg.hidden = true; $('sampleflag').hidden = true;
     $('absrows').innerHTML = ''; addAbsRow();
     $('results').innerHTML = `<div class="panel"><p style="margin:0;color:var(--muted)">表を読み込みました。休む研修医と期間を入れて「候補を出す」を押してください。</p></div>`; LAST = [];
+    saveState();
   }catch(e){ msg.className = 'err'; msg.textContent = e.message || String(e); }
 }
 
@@ -602,18 +634,22 @@ const drop = $('drop');
 drop.addEventListener('drop', e=>{ const f = e.dataTransfer.files[0]; if (f) handleFile(f); });
 $('addabs').addEventListener('click', ()=>addAbsRow());
 $('run').addEventListener('click', render);
+document.addEventListener('change', ()=>saveState());
+document.addEventListener('input', ()=>saveState());
 $('copy').addEventListener('click', async ()=>{
   const t = summaryText(); if (!t) return;
   try{ await navigator.clipboard.writeText(t); $('copied').hidden = false; setTimeout(()=>$('copied').hidden = true, 1800); }
   catch(_){ const ta = $('copyfallback'); ta.value = t; ta.hidden = false; ta.focus(); ta.select(); }
 });
 
-SHEETS = sampleSheets();
-$('sheetchips').innerHTML = '<span class="chip">サンプル:1年次 12人(架空)</span>';
-$('sampleflag').hidden = false;
-addAbsRow({grade:'1年次', who:'1 見本 一花', from:'2026-10-05', to:'2026-10-07'});
-addAbsRow({grade:'1年次', who:'5 見本 五月', from:'2026-10-05', to:'2026-10-05'});
-render();
+if (!restoreState()){
+  SHEETS = sampleSheets();
+  $('sheetchips').innerHTML = '<span class="chip">サンプル:1年次 12人(架空)</span>';
+  $('sampleflag').hidden = false;
+  addAbsRow({grade:'1年次', who:'1 見本 一花', from:'2026-10-05', to:'2026-10-07'});
+  addAbsRow({grade:'1年次', who:'5 見本 五月', from:'2026-10-05', to:'2026-10-05'});
+  render();
+}
 </script>
 
 </body>
