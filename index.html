@@ -264,13 +264,31 @@ function parseSheet(sheetName, rows, date1904){
       }
       labels[d.iso] = lab;
     }
+    resolveDatedLabels(dayCols.map(d=>d.iso).sort(), labels);
     residents.push({no, name: nm.trim().replace(/[\s　]+/g,' '), key: normName(nm), cells, labels, grade: sheetName});
   }
   if (!residents.length) return null;
   return {name: sheetName, days: dayCols.map(d=>d.iso).sort(), residents};
 }
 
-const OFF_RE = /バケ|年休|体調不良|夏季休|育休|病休|欠勤|^休|^[Vv]$/;
+// 「10/10～北部」「10/1-ICU」のように途中から始まるローテ名は、その日付より前は直前のローテのまま扱う
+const DATED_LAB_RE = /^(\d{1,2})\/(\d{1,2})\s*[～~〜\-－ー]?\s*(.*)$/;
+function resolveDatedLabels(days, labels){
+  let before = '', raw = null, segBefore = '';
+  for (const d of days){
+    const lab = labels[d] || '';
+    if (lab !== raw){ raw = lab; segBefore = before; }
+    const m = lab.match(DATED_LAB_RE);
+    if (m){
+      const y = +d.slice(0,4); let start = `${y}-${String(+m[1]).padStart(2,'0')}-${String(+m[2]).padStart(2,'0')}`;
+      if (start > isoAdd(d, 200)) start = `${y-1}${start.slice(4)}`; else if (start < isoAdd(d, -200)) start = `${y+1}${start.slice(4)}`;
+      labels[d] = d < start ? segBefore : (m[3].trim() || segBefore);
+    }
+    before = labels[d];
+  }
+}
+
+const OFF_RE =/バケ|年休|体調不良|夏季休|育休|病休|欠勤|^休|^[Vv]$/;
 function isOff(code){ return !!code && OFF_RE.test(code); }
 function hasDuty(code){ return /●/.test(code||''); }
 function erShifts(code){
